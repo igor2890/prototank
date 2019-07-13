@@ -7,14 +7,15 @@ I2Cdev   I2C_M;
 uint8_t buffer_m[6];
 int16_t ax, ay, az;
 int16_t gx, gy, gz;
-int16_t   mx, my, mz;
+//int16_t   mx, my, mz;
 float heading;
 float tiltheading;
 float Axyz[3];
 float Gxyz[3];
-float Mxyz[3];
+//float Mxyz[3];
 // время выполнения предварительной калибровки
 #define sample_num_mdate  5000
+/*
 volatile float mx_sample[3];
 volatile float my_sample[3];
 volatile float mz_sample[3];
@@ -27,6 +28,7 @@ volatile int mz_max = 0;
 volatile int mx_min = 0;
 volatile int my_min = 0;
 volatile int mz_min = 0;
+*/
 void setup()
 {
     //подключаемся к шине I2C (I2Cdev не может сделать это самостоятельно)
@@ -34,32 +36,33 @@ void setup()
     // инициализация подключения в Мониторе порта
     // ( 38400бод выбрано потому, что стабильная работа наблюдается и при 8MHz и при 16Mhz, поэтому
     // в дальнейшем выставляйте скорость согласно ваших требований)
-    Serial.begin(38400);
+    Serial.begin(9800);
     // Инициализация устройства
-    Serial.println("Initializing I2C devices...");
+    //Serial.println("Initializing I2C devices...");
     accelgyro.initialize();
     // Подтверждение подключения
-    Serial.println("Testing device connections...");
-    Serial.println(accelgyro.testConnection() ? "MPU9250 connection successful" : "MPU9250 connection failed");
+    //Serial.println("Testing device connections...");
+    //Serial.println(accelgyro.testConnection() ? "MPU9250 connection successful" : "MPU9250 connection failed");
     delay(1000);
-    Serial.println("     ");
+    //Serial.println("     ");
     // Предварительная калибровка магнитометра
-    Mxyz_init_calibrated ();
+    //Mxyz_init_calibrated ();
 }
 void loop()
 {
     getAccel_Data();             // Получение значений Акселерометра
     getGyro_Data();              // Получение значений Гироскопа
-    getCompassDate_calibrated(); // В этой функции происходит калибровка магнитометра
-    getHeading();                // после чего мы получаем откалиброванные значения углов поворота
-    getTiltHeading();            // и наклона
-    Serial.println("calibration parameter: ");
+    //getCompassDate_calibrated(); // В этой функции происходит калибровка магнитометра
+    //getHeading();                // после чего мы получаем откалиброванные значения углов поворота
+    //getTiltHeading();            // и наклона
+  /* Serial.println("calibration parameter: ");
     Serial.print(mx_centre);
     Serial.print("         ");
     Serial.print(my_centre);
     Serial.print("         ");
     Serial.println(mz_centre);
     Serial.println("     ");
+    */
     Serial.println("Acceleration(g) of X,Y,Z:");
     Serial.print(Axyz[0]);
     Serial.print(",");
@@ -72,22 +75,22 @@ void loop()
     Serial.print(Gxyz[1]);
     Serial.print(",");
     Serial.println(Gxyz[2]);
-    Serial.println("Compass Value of X,Y,Z:");
-    Serial.print(Mxyz[0]);
-    Serial.print(",");
-    Serial.print(Mxyz[1]);
-    Serial.print(",");
-    Serial.println(Mxyz[2]);
-    Serial.println("The clockwise angle between the magnetic north and X-Axis:"); // "Угол поворота"
-    Serial.print(heading);
-    Serial.println(" ");
-    Serial.println("The clockwise angle between the magnetic north and the projection of the positive X-Axis in the horizontal plane:"); // "Угол наклона"
-    Serial.println(tiltheading);
-    Serial.println("   ");
+   // Serial.println("Compass Value of X,Y,Z:");
+   // Serial.print(Mxyz[0]);
+   // Serial.print(",");
+    //Serial.print(Mxyz[1]);
+   // Serial.print(",");
+   // Serial.println(Mxyz[2]);
+   // Serial.println("The clockwise angle between the magnetic north and X-Axis:"); // "Угол поворота"
+   // Serial.print(heading);
+   // Serial.println(" ");
+  //  Serial.println("The clockwise angle between the magnetic north and the projection of the positive X-Axis in the horizontal plane:"); // "Угол наклона"
+  //  Serial.println(tiltheading);
+  //  Serial.println("   ");
     Serial.println();
     delay(1000);
 }
-void getHeading(void)
+/*void getHeading(void)
 {
     heading = 180 * atan2(Mxyz[1], Mxyz[0]) / PI;
     if (heading < 0) heading += 360;
@@ -129,6 +132,7 @@ void get_calibration_Data ()
     for (int i = 0; i < sample_num_mdate; i++)
     {
         get_one_sample_date_mxyz();
+        */
         /*
         Serial.print(mx_sample[2]);
         Serial.print(" ");
@@ -136,7 +140,7 @@ void get_calibration_Data ()
         Serial.print(" ");
         Serial.println(mz_sample[2]);
         */
-        if (mx_sample[2] >= mx_sample[1])mx_sample[1] = mx_sample[2];
+        /*if (mx_sample[2] >= mx_sample[1])mx_sample[1] = mx_sample[2];
         if (my_sample[2] >= my_sample[1])my_sample[1] = my_sample[2]; // Поиск максимального значения
         if (mz_sample[2] >= mz_sample[1])mz_sample[1] = mz_sample[2];
         if (mx_sample[2] <= mx_sample[0])mx_sample[0] = mx_sample[2];
@@ -159,7 +163,7 @@ void get_one_sample_date_mxyz()
     mx_sample[2] = Mxyz[0];
     my_sample[2] = Mxyz[1];
     mz_sample[2] = Mxyz[2];
-}
+}*/
 void getAccel_Data(void)
 {
     accelgyro.getMotion9(&ax, &ay, &az, &gx, &gy, &gz, &mx, &my, &mz);
@@ -174,7 +178,7 @@ void getGyro_Data(void)
     Gxyz[1] = (double) gy * 250 / 32768;
     Gxyz[2] = (double) gz * 250 / 32768;
 }
-void getCompass_Data(void)
+/*void getCompass_Data(void)
 {
     I2C_M.writeByte(MPU9150_RA_MAG_ADDRESS, 0x0A, 0x01); // активируем магнетометр
     delay(10);
@@ -192,4 +196,4 @@ void getCompassDate_calibrated ()
     Mxyz[0] = Mxyz[0] - mx_centre;
     Mxyz[1] = Mxyz[1] - my_centre;
     Mxyz[2] = Mxyz[2] - mz_centre;
-}
+}*/
