@@ -4,10 +4,12 @@
 // По умолчанию адрес устройства на шине I2C - 0x68
 MPU9250 accelgyro;
 I2Cdev   I2C_M;
+char b[10] = {0}; //создаем массив с нулями
+int i = 1;
 uint8_t buffer_m[6];
 int16_t ax, ay, az;
 int16_t gx, gy, gz;
-//int16_t   mx, my, mz;
+int16_t   mx, my, mz;
 float heading;
 float tiltheading;
 float Axyz[3];
@@ -50,6 +52,31 @@ void setup()
 }
 void loop()
 {
+  while (i == 1)  //цикл ожидания опроса от малинки для установления "личности" (ард.управленец или ард.телеметрия)
+  {
+    if (Serial.available()) {              //если что то пришло
+      Serial.readBytesUntil('$', b, 7 );    //записываем полученное в массив
+      int ii = b[0] - '0';                  // переводим первый символ в число
+      //Serial.write (b);
+      //Serial.write('\n');
+      //Serial.print (ii);
+      //Serial.write('\n');
+      switch(ii){                  //если первый символ
+       case 9:                    //равен 9,
+        delay (300);
+  Serial.print ("900002#");  //то отвечаем малинке, что мы ард.управленец
+        Serial.write('\n');
+        i = 0;                    //и выключаем цикл while
+        break;
+       default:                  //если первый символ не равен 9
+         break;                  //то цикл while повторяется, управление двигателями не начинается
+      }
+    b[0] = '0';                  //на всякий пожарный перезаписываем первый символ символом 0
+    delay (100);
+    }
+   delay (10);
+  }
+  
     getAccel_Data();             // Получение значений Акселерометра
     getGyro_Data();              // Получение значений Гироскопа
     //getCompassDate_calibrated(); // В этой функции происходит калибровка магнитометра
@@ -63,18 +90,20 @@ void loop()
     Serial.println(mz_centre);
     Serial.println("     ");
     */
-    Serial.println("Acceleration(g) of X,Y,Z:");
+    //Serial.println("Acceleration(g) of X,Y,Z:");
     Serial.print(Axyz[0]);
-    Serial.print(",");
+    Serial.print(":");
     Serial.print(Axyz[1]);
-    Serial.print(",");
-    Serial.println(Axyz[2]);
-    Serial.println("Gyro(degress/s) of X,Y,Z:");
+    Serial.print(":");
+    Serial.print(Axyz[2]);
+    //Serial.println("Gyro(degress/s) of X,Y,Z:");
+    Serial.print(":");
     Serial.print(Gxyz[0]);
-    Serial.print(",");
+    Serial.print(":");
     Serial.print(Gxyz[1]);
-    Serial.print(",");
-    Serial.println(Gxyz[2]);
+    Serial.print(":");
+    Serial.print(Gxyz[2]);
+    Serial.println("#");
    // Serial.println("Compass Value of X,Y,Z:");
    // Serial.print(Mxyz[0]);
    // Serial.print(",");
@@ -87,8 +116,7 @@ void loop()
   //  Serial.println("The clockwise angle between the magnetic north and the projection of the positive X-Axis in the horizontal plane:"); // "Угол наклона"
   //  Serial.println(tiltheading);
   //  Serial.println("   ");
-    Serial.println();
-    delay(1000);
+    delay(50);
 }
 /*void getHeading(void)
 {
