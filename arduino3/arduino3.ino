@@ -1,79 +1,69 @@
 #include <Wire.h>
 #include <I2Cdev.h>
 #include <MPU9250.h>
-// По умолчанию адрес устройства на шине I2C - 0x68
+
+const char* handshake_response = "900002#";
 MPU9250 accelgyro;
 I2Cdev   I2C_M;
-char b[10] = {0}; //создаем массив с нулями
-int i = 1;
-uint8_t buffer_m[6];
-int16_t ax, ay, az;
-int16_t gx, gy, gz;
-int16_t   mx, my, mz;
-float heading;
-float tiltheading;
-float Axyz[3];
-float Gxyz[3];
-#define sample_num_mdate  5000
+
+void Handshake( const char* response ) {
+  bool hasHandshake = false;
+  while ( !hasHandshake )  
+  {
+    static char commandBuffer[8];
+    if ( Serial.available( ) ) {  
+      memset( commandBuffer, 0, sizeof( commandBuffer ) );
+      Serial.readBytesUntil( '$', commandBuffer, 7 );   
+      if ( commandBuffer[0] != '9' ) {
+        continue;
+      }        
+      delay(100);
+      Serial.println( response );
+      hasHandshake = true;
+    }
+  }
+};
+
+const char* GetTelemetryString( ) {
+  static char telemetryString[ 30 ];
+  memset( telemetryString, 0, sizeof( telemetryString ) );
+
+  static int16_t accelX,   accelY,   accelZ;
+  static int16_t gyroX,    gyroY,    gyroZ;
+  static int16_t compassX, compassY, compassZ;
+  
+  accelgyro.getMotion9( &accelX,   &accelY,   &accelZ, 
+                        &gyroX,    &gyroY,    &gyroZ, 
+                        &compassX, &compassY, &compassZ );
+  
+  sprintf( telemetryString, 
+           "%d:%d:%d:%d:%d:%d#",
+           accelX,accelY,accelZ,
+           gyroX, gyroY, gyroZ );
+    
+  return  telemetryString; 
+}
+
+
+
 
 void setup()
 {
-    //подключаемся к шине I2C (I2Cdev не может сделать это самостоятельно)
-    Wire.begin();
-    Serial.begin(9600);
-    accelgyro.initialize();
-    delay(1000);
+  Wire.begin();
+  Serial.begin(9600);
+  accelgyro.initialize();
+  delay (1000);  
 }
+
 void loop()
 {
-  while (i == 1)  //цикл ожидания опроса от малинки для установления "личности" (ард.управленец или ард.телеметрия)
-  {
-    if (Serial.available()) {              //если что то пришло
-      Serial.readBytesUntil('$', b, 7 );    //записываем полученное в массив
-      int ii = b[0] - '0';                  // переводим первый символ в число
-      switch(ii){                  //если первый символ
-       case 9:                    //равен 9,
-        delay (300);
-  Serial.print ("900003#");  //то отвечаем малинке, что мы ард.телеметрия
-        Serial.write('\n');
-        i = 0;                    //и выключаем цикл while
-        break;
-       default:                  //если первый символ не равен 9
-         break;                  //то цикл while повторяется, управление двигателями не начинается
-      }
-    b[0] = '0';                  //на всякий пожарный перезаписываем первый символ символом 0
-    delay (100);
-    }
-   delay (10);
+  static bool hasHandshake = false;
+  if( !hasHandshake ) {
+    Handshake( handshake_response ); 
+    hasHandshake = true;
+    delay( 100 );
   }
   
-    getAccel_Data();             // Получение значений Акселерометра
-    getGyro_Data();              // Получение значений Гироскопа
-    Serial.print(Axyz[0]);
-    Serial.print(":");
-    Serial.print(Axyz[1]);
-    Serial.print(":");
-    Serial.print(Axyz[2]);
-    Serial.print(":");
-    Serial.print(Gxyz[0]);
-    Serial.print(":");
-    Serial.print(Gxyz[1]);
-    Serial.print(":");
-    Serial.print(Gxyz[2]);
-    Serial.println("#");
-    delay(50);
-}
-void getAccel_Data(void)
-{
-    accelgyro.getMotion9(&ax, &ay, &az, &gx, &gy, &gz, &mx, &my, &mz);
-    Axyz[0] = (double) ax / 16384;
-    Axyz[1] = (double) ay / 16384;
-    Axyz[2] = (double) az / 16384;
-}
-void getGyro_Data(void)
-{
-    accelgyro.getMotion9(&ax, &ay, &az, &gx, &gy, &gz, &mx, &my, &mz);
-    Gxyz[0] = (double) gx * 250 / 32768;
-    Gxyz[1] = (double) gy * 250 / 32768;
-    Gxyz[2] = (double) gz * 250 / 32768;
+  Serial.println( GetTelemetryString( ) );
+  delay(100);
 }
