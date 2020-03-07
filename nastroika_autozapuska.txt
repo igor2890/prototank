@@ -1,0 +1,10 @@
+gksudo leafpad /etc/xdg/autostart/start.desktop
+
+[Desktop Entry]
+Version=1.0
+Encoding=UTF-8
+Name=Radio
+Comment=
+Exec=sudo python /home/pi/lob/platform.py
+Terminal=true
+Type=Application
