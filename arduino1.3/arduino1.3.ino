@@ -70,6 +70,7 @@ void loop()
         ++i;
  //       Serial.println (commandBuffer);
       }
+      controlStepper ();
     }
 //    Serial.println ("vishli");
   }
