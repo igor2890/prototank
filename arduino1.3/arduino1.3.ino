@@ -14,14 +14,14 @@
 #define stepperDirPin 13
 #define stepperStepPin 12
 
-#define STARTSERVANGLE 15 //10 для 50го
-#define LOWSERVANGLE 80 //65 для 50го
+#define STARTSERVANGLE 10 //10 для 50го, 15 для 51го
+#define LOWSERVANGLE 65 //65 для 50го, 80 для 51го
 
 Servo myservo;
 IRsend irsend;
 
 char commandBuffer[50] = {0}; //создаем массив с нулями
-int IDtank = 51;     //переменная ID танка, который назначает сервер
+int IDtank = 50;     //переменная ID танка, который назначает сервер
 const int stepperSpeed =  1900; //переменная скорости поворота башни в мк на 1 шаг
 const int stepperStopStep = 1750; //ограничение максимального количества шагов поворота в одну сторону
 int stepperCurrentStep = 0;
@@ -62,17 +62,23 @@ void setup()
 void loop()
 {
   if (Serial.available()) {
+    controlStepper ();
     int i = 0;
+    controlStepper ();
     while (commandBuffer[i] != '#') {
+      controlStepper ();
       if (Serial.available()) {
+        controlStepper ();
         commandBuffer[i] = Serial.read();
+        controlStepper ();
         if (commandBuffer[i] == '#') break;
+        controlStepper ();
         ++i;
- //       Serial.println (commandBuffer);
+        controlStepper ();
       }
       controlStepper ();
     }
-//    Serial.println ("vishli");
+    controlStepper ();
   }
 
     switch(commandBuffer[0]){                  //если первый символ
@@ -95,7 +101,9 @@ void loop()
       case '0':
       case '1':
       case '2':
+        controlStepper ();
         controlDC ();
+        controlStepper ();
         shoot ();
         break;
       case 'x':
@@ -146,7 +154,7 @@ int controlStepper ()
     case '2':               //поворачиваем башню налево (положительное значение скорости)
       digitalWrite (stepperDirPin , LOW);
       if ( (stepperCurrentStep <= -(stepperStopStep)) || (micros()- TimeStepper <= stepperSpeed) )
-        return 0;
+        break;
       digitalWrite (stepperStepPin , HIGH);
       digitalWrite (stepperStepPin , LOW);
       --stepperCurrentStep;
@@ -162,12 +170,12 @@ void controlDC ()
   int dvigR0 = commandBuffer[4] - '0';        
   int dvigR1 = commandBuffer[5] - '0';
   int dvigRight = (dvigR0*10)+ dvigR1;
-  dvigRight = map (dvigRight, 1, 99, 30, 150);
+  dvigRight = map (dvigRight, 1, 99, 30, 80);
 
   int dvigL0 = commandBuffer[1] - '0';        
   int dvigL1 = commandBuffer[2] - '0';
   int dvigLeft = (dvigL0*10)+ dvigL1;
-  dvigLeft = map (dvigLeft, 1, 99, 30, 150);
+  dvigLeft = map (dvigLeft, 1, 99, 30, 80);
   
   switch (commandBuffer[3]){         // правая
     case '0':
