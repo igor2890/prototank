@@ -20,7 +20,7 @@
 Servo myservo;
 IRsend irsend;
 
-char commandBuffer[15] = {0}; //создаем массив с нулями
+char commandBuffer[50] = {0}; //создаем массив с нулями
 int IDtank = 51;     //переменная ID танка, который назначает сервер
 const int stepperSpeed =  1900; //переменная скорости поворота башни в мк на 1 шаг
 const int stepperStopStep = 1750; //ограничение максимального количества шагов поворота в одну сторону
@@ -28,6 +28,8 @@ int stepperCurrentStep = 0;
 int servoAngle = STARTSERVANGLE; //угол сервы
 unsigned long TimeServo;
 unsigned long TimeStepper;
+unsigned long TimeShoot;
+unsigned long TimeDead;
 const char* response_TYPE = "900001#";
 const char* response_OK = "888888#";
 
@@ -59,8 +61,19 @@ void setup()
 
 void loop()
 {
-  if (Serial.available()) {        //если что-то пришло в буфер - читаем
-  Serial.readBytesUntil('$', commandBuffer, 11 ); //читаем в массив b до тех пор, пока не увидим символ $ либо не считаем 9 символов
+  if (Serial.available()) {
+    int i = 0;
+    while (commandBuffer[i] != '#') {
+      if (Serial.available()) {
+        commandBuffer[i] = Serial.read();
+        if (commandBuffer[i] == '#') break;
+        ++i;
+ //       Serial.println (commandBuffer);
+      }
+    }
+//    Serial.println ("vishli");
+  }
+
     switch(commandBuffer[0]){                  //если первый символ
      case '9':
         delay (500);
@@ -82,15 +95,17 @@ void loop()
       case '1':
       case '2':
         controlDC ();
-        break;        
+        shoot ();
+        break;
+      case 'x':
+        deaddance ();
+        break;
       default:
+        memset( commandBuffer, 0, sizeof( commandBuffer ) );
         break;
      }
-   }
    controlStepper ();
    controlServo ();
-   shoot ();
-   deaddance ();
 } 
 
 void controlServo ()
@@ -197,6 +212,7 @@ void controlDC ()
 void shoot ()
 {
   if ( commandBuffer[8] == '1'){
+//    Serial.println ("shoot");
     for (int i = 0; i < 3; i++) {
       irsend.sendSony(IDtank, 12);
       if ( commandBuffer[0] == '0' && commandBuffer[3] == '0' ) {
@@ -226,13 +242,19 @@ void shoot ()
       }
       delay(50);
     }
-  commandBuffer[8] == '0';
+  commandBuffer[8] = '0';
+  while (Serial.available() != 0)
+    {
+      Serial.read();
+//      Serial.println ("stiraem_shoot");
+    }
   }
 }
 
 void deaddance ()
 {
   if ( commandBuffer[2] == 'y'){
+//    Serial.println ("dead");
       digitalWrite(dvig1A0, LOW);
       digitalWrite(dvig2A1, LOW);
       myservo.write (LOWSERVANGLE);
@@ -249,6 +271,12 @@ void deaddance ()
       digitalWrite(dvig1A0, LOW);
       digitalWrite(dvig2A1, LOW);
       delay (1500);
+      memset( commandBuffer, 0, sizeof( commandBuffer ) );
+      while (Serial.available() != 0)
+      {
+        Serial.read();
+//        Serial.println ("stiraem_dead");
       }
-    memset( commandBuffer, 0, sizeof( commandBuffer ) );
+
+  }
 }
