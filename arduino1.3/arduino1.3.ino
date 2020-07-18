@@ -1,18 +1,18 @@
 #include <Servo.h>
 #include <IRremote.h>
 
-#define dvig1A0 2 //едем не едем правая
-#define dvig1D7 11 //правая назад
-#define dvig1D8 4 //правая вперед
-#define dvig1D5 5 //pwm правая
+#define dvig1A0 2 //едем не едем правая PINMOTOR_RIGHT_ENABLE
+#define dvig1D7 11 //правая назад PINMOTOR_RIGHT_BACK
+#define dvig1D8 4 //правая вперед PINMOTOR_RIGHT_FORWARD
+#define dvig1D5 5 //pwm правая PINMOTOR_RIGHT_PWM
 
-#define dvig2A1 9 //едем не едем левая
-#define dvig2D9 8 //левая вперед
-#define dvig2D4 7 //левая назад
-#define dvig2D6 6 //pwm левая
+#define dvig2A1 9 //едем не едем левая PINMOTOR_LEFT_ENABLE
+#define dvig2D9 8 //левая вперед PINMOTOR_LEFT_FORWARD
+#define dvig2D4 7 //левая назад PINMOTOR_LEFT_BACK
+#define dvig2D6 6 //pwm левая PINMOTOR_LEFT_PWM
 
-#define stepperDirPin 13
-#define stepperStepPin 12
+#define PINSTEPPER_DIR 13
+#define PINSTEPPER_STEP 12
 
 #define STARTSERVANGLE 10 //10 для 50го, 15 для 51го
 #define LOWSERVANGLE 65 //65 для 50го, 80 для 51го
@@ -52,9 +52,9 @@ void setup()
 
   digitalWrite(dvig2A1, LOW);
   
-  pinMode(stepperDirPin, OUTPUT);
-  pinMode(stepperStepPin, OUTPUT);
-  digitalWrite (stepperStepPin , LOW);
+  pinMode(PINSTEPPER_DIR, OUTPUT);
+  pinMode(PINSTEPPER_STEP, OUTPUT);
+  digitalWrite (PINSTEPPER_STEP , LOW);
 
   delay (500);
 }
@@ -143,26 +143,30 @@ int controlStepper ()
 {
   switch (commandBuffer[7]){
     case '1':               //поворачиваем башню направо (отрицательное значение скорости)
-      digitalWrite (stepperDirPin , HIGH);
+      digitalWrite (PINSTEPPER_DIR , HIGH);
       if ( (stepperCurrentStep >= stepperStopStep) || (micros()- TimeStepper <= stepperSpeed) )
         break;
-      digitalWrite (stepperStepPin , HIGH);
-      digitalWrite (stepperStepPin , LOW);
+      makeStep ();
       ++stepperCurrentStep;
       TimeStepper = micros();
       break;
     case '2':               //поворачиваем башню налево (положительное значение скорости)
-      digitalWrite (stepperDirPin , LOW);
+      digitalWrite (PINSTEPPER_DIR , LOW);
       if ( (stepperCurrentStep <= -(stepperStopStep)) || (micros()- TimeStepper <= stepperSpeed) )
         break;
-      digitalWrite (stepperStepPin , HIGH);
-      digitalWrite (stepperStepPin , LOW);
+      makeStep ();
       --stepperCurrentStep;
       TimeStepper = micros();
       break;
     default:
       break;
   }
+}
+
+void makeStep ()
+{
+      digitalWrite (PINSTEPPER_STEP , HIGH);
+      digitalWrite (PINSTEPPER_STEP , LOW);
 }
 
 void controlDC ()
