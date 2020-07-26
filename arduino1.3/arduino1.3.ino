@@ -29,6 +29,7 @@
 #define MAKE_SHOOT 8
 
 #define ID_TANK 50
+#define SERIAL_SPEED 115200
 
 Servo myservo;
 IRsend irsend;
@@ -48,7 +49,7 @@ const char* response_OK = "888888#";
 
 void setup()
 {
-  Serial.begin(115200);
+  Serial.begin(SERIAL_SPEED);
   Serial.setTimeout (10);
   myservo.attach (10);
   myservo.write (servoAngle);
@@ -74,20 +75,20 @@ void setup()
 
 void loop()
 {
-  if (Serial.available())
-  {
+  if (Serial.available()) {
     int i = 0;
-    while (Serial.available())
-      {
-        controlTower ();
+    while (commandBuffer[i] != '#') {
+      controlStepper ();
+      if (Serial.available()) {
         commandBuffer[i] = Serial.read();
-        if (commandBuffer[i] == '#')
+        controlStepper ();
+        if (commandBuffer[i] == '#') 
           break;
         ++i;
+        controlStepper ();
       }
+    }
   }
-  
-  controlTower ();
 
   switch(commandBuffer[COMMAND_TYPE_AND_MOVE_LEFTMOTOR]){
     case '9':
