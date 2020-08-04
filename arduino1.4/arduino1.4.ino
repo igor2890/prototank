@@ -14,6 +14,8 @@
 #define PINSTEPPER_DIR 13
 #define PINSTEPPER_STEP 12
 
+#define PINSERVO 10
+
 #define SERVANGLE_TOP 10 //10 для 50го, 15 для 51го  
 #define SERVANGLE_BOTTOM 65 //65 для 50го, 80 для 51го
 
@@ -52,7 +54,7 @@ void setup()
 {
   Serial.begin(SERIAL_SPEED);
   Serial.setTimeout (10);
-  myservo.attach (10);
+  myservo.attach (PINSERVO);
   myservo.write (servoAngle);
 
   pinMode(PINMOTOR_RIGHT_ENABLE, OUTPUT);   
@@ -412,9 +414,3 @@ void calculationDownCorrectionOfSpeedTower ()
   antiStartSpeedCorrection -= accelerationValueOfTower;
   forMakeBiggerLagBetweenStepTower = startSpeedCorretion - antiStartSpeedCorrection;
 }
-
-
-
-
-
-

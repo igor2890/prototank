@@ -78,14 +78,14 @@ void loop()
   if (Serial.available()) {
     int i = 0;
     while (commandBuffer[i] != '#') {
-      controlStepper ();
+      controlTower ();
       if (Serial.available()) {
         commandBuffer[i] = Serial.read();
-        controlStepper ();
+        controlTower ();
         if (commandBuffer[i] == '#') 
           break;
         ++i;
-        controlStepper ();
+        controlTower ();
       }
     }
   }
@@ -135,7 +135,7 @@ void controlGun ()
       break;
     default:
       break;
-  } 
+  }
 }
 
 void controlTower ()

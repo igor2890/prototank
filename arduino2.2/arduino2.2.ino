@@ -10,6 +10,8 @@
 #define RECV_PIN 11
 #define VOLT_PIN A7
 
+#define SERIAL_SPEED 115200
+
 IRrecv irrecv(RECV_PIN);
 decode_results results;
 
@@ -35,7 +37,7 @@ float angle_y_glob_start_corr = 0;
 //_________________________________
 //part of accel
 
-typedef union accel_t_gyro_union
+/*typedef*/ union accel_t_gyro_union
 {
   struct
   {
@@ -160,9 +162,8 @@ void calibrate_sensors() {
 void setup()
 {
   Wire.begin();
-  Serial.begin(115200);
+  Serial.begin(SERIAL_SPEED);
   Serial.setTimeout (10);
-  
   int error;
   uint8_t c;
   error = MPU6050_read (MPU6050_WHO_AM_I, &c, 1);
@@ -172,50 +173,62 @@ void setup()
   set_last_read_angle_data(millis(), 0, 0, 0, 0, 0, 0);
   
   irrecv.enableIRIn();
-  GetVoltValue();
+  updatingVoltValue();
   freqVolt = 10000;
   delay (2000);
 
-  for (int ii = 0 ; ii  < 500 ; ++ii)
-    {
-    Take_Angle();
-    delay (5);
-    }
-  angle_x_glob_start_corr = angle_x_global;
-  angle_y_glob_start_corr = angle_y_global;
-  delay (1000);  
+  alignmentGyroAtStart ();
 }
 
 void loop()
 {
-  GetCommand();   //Слушаем команды от малинки
-  GetVoltValue(); //Раз в 10 секунд обновляем значение напряжения батареи
-  CatchHit();     //Слушаем попадания в танк
-  SendTele();     //Раз в 40 милисекунд (25 раз в секунду)
-                  //отправляем телеметрию + напряжение батареи + id попавшего в нас танка
+  GetCommand();   
+  updatingVoltValue();
+  CatchHit();
+  SendTele();
 }
 
-void GetCommand(){
- if ( Serial.available( ) ){  
-   Serial.readBytesUntil( '$', commandBuffer, 10 );
-   delay (200);
-   int ee = commandBuffer[0] - '0';
-   
-   switch(ee){
-     case 9:
-      Serial.println ( response );
-      delay (1000);
-      hasHandshake = true;
-      memset( commandBuffer, 0, sizeof( commandBuffer ) );
-     break;
-     default:
-      hasHandshake = false;
-     break;
-   }
- }
+void GetCommand()
+{
+ if (Serial.available())
+  {
+    int i = 0;
+    while (Serial.available())
+      {
+        commandBuffer[i] = Serial.read();
+        if (commandBuffer[i] == '#')
+          break;
+        ++i;
+      }
+    delay (200);
+    switch(commandBuffer[0])
+    {
+      case '9':
+        Serial.println ( response );
+        delay (1000);
+        hasHandshake = true;
+        memset( commandBuffer, 0, sizeof( commandBuffer ) );
+      break;
+      default:
+        hasHandshake = false;
+      break;
+    }
+  }
 }
 
-void GetVoltValue (){
+void alignmentGyroAtStart ()
+{
+  for (int i = 0 ; i  < 500 ; ++i)
+    {
+    TakeAngle();
+    delay (5);
+    }
+  angle_x_glob_start_corr = angle_x_global;
+  angle_y_glob_start_corr = angle_y_global;
+  delay (1000); 
+}
+
+void updatingVoltValue (){
     if ((actualTimeVolt = millis()) - startTimeVolt >= freqVolt ){
       battVoltValue = (analogRead(VOLT_PIN) * 10) / 43;
       startTimeVolt = millis();
@@ -232,7 +245,7 @@ void CatchHit(){
 void SendTele(){
   if (hasHandshake){
     if ((actualTimeSend = millis()) - startTimeSend >= freqSend ){
-      Take_Angle();
+      TakeAngle();
       angle_x_global -= angle_x_glob_start_corr;
       angle_y_global -= angle_y_glob_start_corr;
        Serial.print(angle_x_global, 2);
@@ -248,7 +261,7 @@ void SendTele(){
   }
 }
 
-void Take_Angle ()
+void TakeAngle ()
 {
   int error;
   double dT;

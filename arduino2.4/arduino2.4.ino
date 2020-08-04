@@ -19,9 +19,9 @@ const char* response = "900002#";
 char commandBuffer[15] = {0};
 
 bool hasHandshake = false;
-unsigned long long int startTimeSend = 0;
-unsigned long long int actualTimeSend = 0;
-const int freqSend = 40;
+//unsigned long long int startTimeSend = 0;
+//unsigned long long int actualTimeSend = 0;
+//const int freqSend = 40;
 unsigned long long int startTimeVolt = 0;
 unsigned long long int actualTimeVolt = 0;
 int freqVolt = 0;
@@ -32,6 +32,10 @@ float angle_x_global = 0;
 float angle_y_global = 0;
 float angle_x_glob_start_corr = 0;
 float angle_y_glob_start_corr = 0;
+
+float angle_x_buffer[25] = {0};
+float angle_y_buffer[25] = {0};
+int counterAngle = 1;
 
 
 //_________________________________
@@ -193,14 +197,18 @@ void GetCommand()
  if (Serial.available())
   {
     int i = 0;
-    while (Serial.available())
+    while (1)
       {
-        commandBuffer[i] = Serial.read();
-        if (commandBuffer[i] == '#')
-          break;
-        ++i;
+        if (Serial.available())
+        {
+          commandBuffer[i] = Serial.read();
+          if (commandBuffer[i] == '#')
+            break;
+          ++i;
+        }
       }
     delay (200);
+    
     switch(commandBuffer[0])
     {
       case 'T':
@@ -244,20 +252,33 @@ void CatchHit(){
 
 void SendTele(){
   if (hasHandshake){
-    if ((actualTimeSend = millis()) - startTimeSend >= freqSend ){
-      TakeAngle();
-      angle_x_global -= angle_x_glob_start_corr;
-      angle_y_global -= angle_y_glob_start_corr;
-       Serial.print(angle_x_global, 2);
-       Serial.print(F(":"));
-       Serial.print(angle_y_global, 2);
-       Serial.print(F(":"));      
-       Serial.print (battVoltValue , DEC);
-       Serial.print (":");
-       Serial.println (shooterTankID , DEC);
-      startTimeSend = millis();
+    TakeAngle();
+    angle_x_global -= angle_x_glob_start_corr;
+    angle_y_global -= angle_y_glob_start_corr;
+    angle_x_buffer[counterAngle] = angle_x_global;
+    angle_y_buffer[counterAngle] = angle_y_global;
+    if (counterAngle == 20)
+    {
+      angle_x_global = angle_x_buffer[1];
+      angle_y_global = angle_y_buffer[1];
+      for(int i = 2; i<21; ++i)
+      {
+        angle_x_global += angle_x_buffer[counterAngle];
+        angle_y_global += angle_y_buffer[counterAngle];
+      }
+      angle_x_global /= 20;
+      angle_y_global /= 20;
+      Serial.print(angle_x_global, 0);
+      Serial.print(F(";"));
+      Serial.print(angle_y_global, 0);
+      Serial.print(F(";"));      
+      Serial.print (battVoltValue , DEC);
+      Serial.print (";");
+      Serial.println (shooterTankID , DEC);
       shooterTankID = 0;
+      counterAngle = 0;
     }
+    ++counterAngle;
   }
 }
 
