@@ -33,17 +33,13 @@ IRsend irsend;
 uint8_t commandBuffer[10] = {0};
 int IDtank = ID_TANK;
 //Tower movement
-const int lagBetweenStepTower =  1900; //переменная скорости поворота башни в мк на 1 шаг (меньше - скорость выше)
-const int startSpeedCorretion = 2000; //переменная настраивает стартовую скорость башни;
-const int accelerationValueOfTower = startSpeedCorretion / 40; //переменная задает ускорение (в статичной реализации без синусы);
-int antiStartSpeedCorrection = 0;
-const int extremePositionOfTower = 1750; //ограничение максимального количества шагов поворота в одну сторону
+const int extremePositionOfTower = 3500; //ограничение максимального количества шагов поворота в одну сторону 1750 * 2
 int counterOfTowerSteps = 0;
-int forMakeBiggerLagBetweenStepTower = 0;
+float valueTowerTIM = 45000; //от 43 до 53
 
 int servoAngle = SERVANGLE_TOP; //угол сервы
 unsigned long timePointOfLastServoMove;
-unsigned long timePointOfLastTowerStep;
+unsigned long timePointOfLastChangeSpeedTower;
 const int lagBetweenMoveGun = 50;
 const char* response_TYPE = "900001#";
 const char* response_OK = "888888#";
@@ -55,16 +51,22 @@ void setup()
   Serial.setTimeout (10);
   Wire.begin();
 
+//настраиваем прерывание timer1 для управлением шаговиком
+  noInterrupts();
+  TCCR1A = 0;
+  TCCR1B = 0;
+  TCNT1 = valueTowerTIM;
+  TIMSK1 |= (1 << TOIE1); 
+  interrupts();
+
   pinMode(PINMOTOR_RIGHT_ENABLE, OUTPUT);   
   pinMode(PINMOTOR_RIGHT_BACK, OUTPUT);  
   pinMode(PINMOTOR_RIGHT_FORWARD, OUTPUT);   
-
   digitalWrite(PINMOTOR_RIGHT_ENABLE, LOW);
   
   pinMode(PINMOTOR_LEFT_ENABLE, OUTPUT);   
   pinMode(PINMOTOR_LEFT_FORWARD, OUTPUT);  
   pinMode(PINMOTOR_LEFT_BACK, OUTPUT);   
-
   digitalWrite(PINMOTOR_LEFT_ENABLE, LOW);
   
   pinMode(PINSTEPPER_DIR, OUTPUT);
@@ -240,11 +242,11 @@ void moveGunUp () // переписать на i2c
     --servoAngle;
 	Wire.beginTransmission(PCA9685_ADDRESS); //здесь отредактировать - надо вносить изменения в два регистра
 	//плюс на старте прописать частоту и в 3 отправки (сон, частота, пробуждение) и стартовые значения ствола в 4 отправки (4 регистра)
-	Wire.write(REG);
+//	Wire.write(REG);
 	Wire.write(servoAngle);
 	Wire.endTransmission();
 	Wire.beginTransmission(PCA9685_ADDRESS);
-	Wire.write(REG);
+//	Wire.write(REG);
 	Wire.write(servoAngle);
 	Wire.endTransmission();
     timePointOfLastServoMove = millis();
@@ -347,54 +349,40 @@ void motionOnRecoil (int i)
 
 void needTurnTowerRight ()
 {
-  if ( !(counterOfTowerSteps >= extremePositionOfTower) && !(micros()- timePointOfLastTowerStep <= lagBetweenStepTower + forMakeBiggerLagBetweenStepTower) )
+  if ( !(counterOfTowerSteps >= extremePositionOfTower))
   {  
     PORTB |= B00100000; //digitalWrite (PINSTEPPER_DIR , HIGH);
-    isCurrentTowerDirectionRight = true;
-    makeStepTower ();
-    ++counterOfTowerSteps;
-    timePointOfLastTowerStep = micros();
-    calculationUpCorrectionOfSpeedTower ();
+    isCurrentTowerDirectionRight = true; //можно переписать на чтение значения бита
+    TCCR1B |= (1 << CS10);
+    if (valueTowerTIM < 53000) valueTowerTIM += 50;
+    delay (5);
   }
+  else brakeAndStopTower ();
 }
 
 void needTurnTowerLeft ()
 {
-  if ( !(counterOfTowerSteps <= -(extremePositionOfTower)) && !(micros()- timePointOfLastTowerStep <= lagBetweenStepTower + forMakeBiggerLagBetweenStepTower) )
+  if ( !(counterOfTowerSteps <= -(extremePositionOfTower)))
   {
     PORTB &= ~B00100000; //digitalWrite (PINSTEPPER_DIR , LOW);
-    isCurrentTowerDirectionRight = false;
-    makeStepTower ();
-    --counterOfTowerSteps;
-    timePointOfLastTowerStep = micros();
-    calculationUpCorrectionOfSpeedTower ();
+    isCurrentTowerDirectionRight = false; //можно переписать на чтение значения бита
+    TCCR1B |= (1 << CS10);
+    if (valueTowerTIM < 53000) valueTowerTIM += 50;
+    delay (5);
   }
+  else brakeAndStopTower ();
 }
 
 void brakeAndStopTower ()
 {
-  if ( antiStartSpeedCorrection > 0 )
-  {
-    switch (isCurrentTowerDirectionRight)
-    {
-      case true:
-        if ( !(counterOfTowerSteps >= extremePositionOfTower) && !(micros()- timePointOfLastTowerStep <= lagBetweenStepTower + forMakeBiggerLagBetweenStepTower) )
-        {  
-          makeStepTower ();
-          ++counterOfTowerSteps;
-          timePointOfLastTowerStep = micros();
-          calculationDownCorrectionOfSpeedTower ();
-        }
-        break;
-      default:
-        if ( !(counterOfTowerSteps <= -(extremePositionOfTower)) && !(micros()- timePointOfLastTowerStep <= lagBetweenStepTower + forMakeBiggerLagBetweenStepTower) )
-        {
-          makeStepTower ();
-          --counterOfTowerSteps;
-          timePointOfLastTowerStep = micros();
-          calculationDownCorrectionOfSpeedTower ();
-        }
-        break;
-    }
-  }
+  TCCR1B &= ~(1 << CS10);
+  valueTowerTIM = 46000;
+}
+
+ISR(TIMER1_OVF_vect)
+{
+  TCNT1 = valueTowerTIM;
+  digitalWrite(PINSTEPPER_STEP, digitalRead(PINSTEPPER_STEP) ^ 1);
+  if (isCurrentTowerDirectionRight) ++counterOfTowerSteps;
+  else --counterOfTowerSteps;
 }
