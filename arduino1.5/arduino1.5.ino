@@ -51,7 +51,7 @@ void setup()
   Serial.setTimeout (10);
   Wire.begin();
 
-//настраиваем прерывание timer1 для управлением шаговиком
+//настраиваем прерывание timer1 для управления шаговиком башни
   noInterrupts();
   TCCR1A = 0;
   TCCR1B = 0;
@@ -74,37 +74,53 @@ void setup()
   pinMode(PINSTEPPER_STEP, OUTPUT);
   digitalWrite (PINSTEPPER_STEP , LOW);
 
+  //на старте прописать частоту в 3 отправки (сон, частота, пробуждение)
+  //и стартовые значения ствола в 4 отправки (4 регистра)
+  writeToI2c (PCA9685_ADDRESS , int reg , int byte); // сон
+  writeToI2c (PCA9685_ADDRESS , int reg , int byte); // частота
+  writeToI2c (PCA9685_ADDRESS , int reg , int byte); // пробуждение
+  writeToI2c (PCA9685_ADDRESS , int reg , int byte); // и 4 регистра
+  writeToI2c (PCA9685_ADDRESS , int reg , int byte);
+  writeToI2c (PCA9685_ADDRESS , int reg , int byte);
+  writeToI2c (PCA9685_ADDRESS , int reg , int byte);
+
   delay (500);
+
+
 }
 
 void loop() 
 {
 while (1)
 {
-  if (Serial.available()) //корявое тут все, переделать
+  if (Serial.available())
   { 
     int i = 0;
-    while (commandBuffer[i] != '#')
+    while (1)
     {
-      controlTower ();
       if (Serial.available())
       {
         commandBuffer[i] = Serial.read();
-        controlTower ();
         if (commandBuffer[i] == '#') 
           break;
         ++i;
       }
-      controlTower ();
     }
     
     switch(commandBuffer[COMMAND_TYPE])
     {
       case 'T':
+        brakeAndStopTower ();
+        stopMotorLeft ();
+        stopMotorRight ();
         delay (500);
         Serial.println (response_TYPE);
+        cleanCommandBuffer ();
         break;
       case 'W':
+        brakeAndStopTower ();
+        stopMotorLeft ();
+        stopMotorRight ();
         IDtank = commandBuffer[MOTORSPEED_OR_ID];
         delay (500);
         Serial.println (response_OK);
@@ -115,13 +131,16 @@ while (1)
         controlMotor ();
         break;
       case 'F':
+        brakeAndStopTower ();
         shoot ();
         break;
       case 'X':
+        brakeAndStopTower ();
         motionFromHit ();
         cleanCommandBuffer ();
         break;
       default:
+        brakeAndStopTower ();
         cleanCommandBuffer ();
         break;
     }
@@ -240,15 +259,8 @@ void moveGunUp () // переписать на i2c
   if (servoAngle > SERVANGLE_TOP && millis()- timePointOfLastServoMove > lagBetweenMoveGun)
   {
     --servoAngle;
-	Wire.beginTransmission(PCA9685_ADDRESS); //здесь отредактировать - надо вносить изменения в два регистра
-	//плюс на старте прописать частоту и в 3 отправки (сон, частота, пробуждение) и стартовые значения ствола в 4 отправки (4 регистра)
-//	Wire.write(REG);
-	Wire.write(servoAngle);
-	Wire.endTransmission();
-	Wire.beginTransmission(PCA9685_ADDRESS);
-//	Wire.write(REG);
-	Wire.write(servoAngle);
-	Wire.endTransmission();
+    writeToI2c (PCA9685_ADDRESS , int reg , int byte);//недоделано
+    writeToI2c (PCA9685_ADDRESS , int reg , int byte);
     timePointOfLastServoMove = millis();
   }
 }
@@ -258,7 +270,8 @@ void moveGunDown () //переписать на i2c
   if (servoAngle < SERVANGLE_BOTTOM && millis()- timePointOfLastServoMove > lagBetweenMoveGun)
   {
     ++servoAngle;
-    //myservo.write (servoAngle);
+    writeToI2c (PCA9685_ADDRESS , int reg , int byte);//недоделано
+    writeToI2c (PCA9685_ADDRESS , int reg , int byte);
     timePointOfLastServoMove = millis();
   }
 }
@@ -349,40 +362,70 @@ void motionOnRecoil (int i)
 
 void needTurnTowerRight ()
 {
-  if ( !(counterOfTowerSteps >= extremePositionOfTower))
+  if ( !(counterOfTowerSteps > extremePositionOfTower))
   {  
     PORTB |= B00100000; //digitalWrite (PINSTEPPER_DIR , HIGH);
     isCurrentTowerDirectionRight = true; //можно переписать на чтение значения бита
     TCCR1B |= (1 << CS10);
-    if (valueTowerTIM < 53000) valueTowerTIM += 50;
+    if (valueTowerTIM < 53000)
+    {
+      valueTowerTIM += 50;
+    }
     delay (5);
   }
-  else brakeAndStopTower ();
+  else
+  {
+    brakeAndStopTower ();
+  }
 }
 
 void needTurnTowerLeft ()
 {
-  if ( !(counterOfTowerSteps <= -(extremePositionOfTower)))
+  if ( !(counterOfTowerSteps < -(extremePositionOfTower)))
   {
     PORTB &= ~B00100000; //digitalWrite (PINSTEPPER_DIR , LOW);
     isCurrentTowerDirectionRight = false; //можно переписать на чтение значения бита
     TCCR1B |= (1 << CS10);
-    if (valueTowerTIM < 53000) valueTowerTIM += 50;
+    if (valueTowerTIM < 53000)
+    {
+      valueTowerTIM += 50;
+    }
     delay (5);
   }
-  else brakeAndStopTower ();
+  else
+  {
+    brakeAndStopTower ();
+  }
 }
 
 void brakeAndStopTower ()
 {
   TCCR1B &= ~(1 << CS10);
   valueTowerTIM = 46000;
+  PORTB &= ~B00010000; //digitalWrite(PINSTEPPER_STEP, LOW);
 }
 
+void writeToI2c (int address , int reg , int byte)
+{
+  Wire.beginTransmission(address);
+  Wire.write(reg);
+	Wire.write(byte);
+	Wire.endTransmission();
+}
+
+//прерывание для вращения башней
 ISR(TIMER1_OVF_vect)
 {
   TCNT1 = valueTowerTIM;
   digitalWrite(PINSTEPPER_STEP, digitalRead(PINSTEPPER_STEP) ^ 1);
-  if (isCurrentTowerDirectionRight) ++counterOfTowerSteps;
-  else --counterOfTowerSteps;
+  if (isCurrentTowerDirectionRight)
+  {
+    ++counterOfTowerSteps;
+  }
+  else
+  {
+    --counterOfTowerSteps;
+  }
 }
+
+//здесь переименовать все функции управления digitalWrite всеми пинами

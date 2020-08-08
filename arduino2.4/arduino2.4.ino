@@ -186,10 +186,13 @@ void setup()
 
 void loop()
 {
+while(1)
+{
   GetCommand();   
   updatingVoltValue();
   CatchHit();
   SendTele();
+}
 }
 
 void GetCommand()
