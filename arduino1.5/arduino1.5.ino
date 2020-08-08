@@ -23,7 +23,20 @@
 #define MOTOR_GUN_TOWER 2
 
 #define PCA9685_ADDRESS 0x40
+#define PCA9685_SCALE 0x79 // = 25Mhz / (4096*50) - 1
 
+//Register addreses PCA9685
+#define PCA9685_REG_MODE1 0x00
+#define PCA9685_REG_MODE2 0x01
+#define PCA9685_REG_LED0_ON_L 0x06
+#define PCA9685_REG_LED0_ON_H 0x07
+#define PCA9685_REG_LED0_OFF_L 0x08
+#define PCA9685_REG_LED0_OFF_H 0x09
+#define PCA9685_REG_PRE_SCALE 0xFE //Writes to PRE_SCALE register are blocked when SLEEP bit is logic 0 (MODE 1)
+
+//bit masks PCA9685
+#define SLEEP_ON 0x11
+#define SLEEP_OFF 0x01
 
 #define ID_TANK 50
 #define SERIAL_SPEED 115200
@@ -76,13 +89,13 @@ void setup()
 
   //на старте прописать частоту в 3 отправки (сон, частота, пробуждение)
   //и стартовые значения ствола в 4 отправки (4 регистра)
-  writeToI2c (PCA9685_ADDRESS , int reg , int byte); // сон
-  writeToI2c (PCA9685_ADDRESS , int reg , int byte); // частота
-  writeToI2c (PCA9685_ADDRESS , int reg , int byte); // пробуждение
-  writeToI2c (PCA9685_ADDRESS , int reg , int byte); // и 4 регистра
-  writeToI2c (PCA9685_ADDRESS , int reg , int byte);
-  writeToI2c (PCA9685_ADDRESS , int reg , int byte);
-  writeToI2c (PCA9685_ADDRESS , int reg , int byte);
+  writeToI2c (PCA9685_ADDRESS , PCA9685_REG_MODE1 , SLEEP_ON); // сон
+  writeToI2c (PCA9685_ADDRESS , PCA9685_REG_PRE_SCALE , SCALE); // частота
+  writeToI2c (PCA9685_ADDRESS , PCA9685_REG_MODE1 , SLEEP_OFF); // пробуждение
+  writeToI2c (PCA9685_ADDRESS , PCA9685_REG_LED0_ON_L , 0x00); // и 4 регистра
+  writeToI2c (PCA9685_ADDRESS , PCA9685_REG_LED0_ON_H , 0x00);
+  writeToI2c (PCA9685_ADDRESS , PCA9685_REG_LED0_OFF_L , 0x37);
+  writeToI2c (PCA9685_ADDRESS , PCA9685_REG_LED0_OFF_H , 0x01);
 
   delay (500);
 
@@ -253,6 +266,12 @@ void motionFromHit ()
 
     cleanSerialBuffer ();
 }
+
+//544 мкс    1520 мкс    2400 мкс          20000мкс 4.882
+//112        311         491                          4096
+//servo_min = 0x70 , но по факту 0x79
+//servo_mid = 0x137
+//servo_max = 0x1EB
 
 void moveGunUp () // переписать на i2c
 {
