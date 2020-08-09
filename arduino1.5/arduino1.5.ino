@@ -14,8 +14,9 @@
 #define PINSTEPPER_DIR 13
 #define PINSTEPPER_STEP 12
 
-#define SERVANGLE_TOP 10 //10 для 50го, 15 для 51го  
-#define SERVANGLE_BOTTOM 65 //65 для 50го, 80 для 51го
+#define SERVANGLE_TOP 0x79 //10 для 50го, 15 для 51го
+#define SERVANGLE_MID 0x137
+#define SERVANGLE_BOTTOM 0x1EB //65 для 50го, 80 для 51го
 
 //Array element numbers
 #define COMMAND_TYPE 0
@@ -25,14 +26,14 @@
 #define PCA9685_ADDRESS 0x40
 #define PCA9685_SCALE 0x79 // = 25Mhz / (4096*50) - 1
 
-//Register addreses PCA9685
+//Register addresses PCA9685
 #define PCA9685_REG_MODE1 0x00
 #define PCA9685_REG_MODE2 0x01
 #define PCA9685_REG_LED0_ON_L 0x06
 #define PCA9685_REG_LED0_ON_H 0x07
 #define PCA9685_REG_LED0_OFF_L 0x08
 #define PCA9685_REG_LED0_OFF_H 0x09
-#define PCA9685_REG_PRE_SCALE 0xFE //Writes to PRE_SCALE register are blocked when SLEEP bit is logic 0 (MODE 1)
+#define PCA9685_REG_PRE_SCALE 0xFE
 
 //bit masks PCA9685
 #define SLEEP_ON 0x11
@@ -45,18 +46,54 @@ IRsend irsend;
 
 uint8_t commandBuffer[10] = {0};
 int IDtank = ID_TANK;
-//Tower movement
-const int extremePositionOfTower = 3500; //ограничение максимального количества шагов поворота в одну сторону 1750 * 2
-int counterOfTowerSteps = 0;
-float valueTowerTIM = 45000; //от 43 до 53
 
-int servoAngle = SERVANGLE_TOP; //угол сервы
+//Tower movement
+const int extremePositionOfTower = 3500; //ограничение максимального количества шагов (при выставлении 1/4  шага) поворота в одну сторону 1750 * 2
+int counterOfTowerSteps = 0;
+float valueTowerTIM = 45000; //от 43 до 53 тыс оптимально
+
 unsigned long timePointOfLastServoMove;
 unsigned long timePointOfLastChangeSpeedTower;
 const int lagBetweenMoveGun = 50;
 const char* response_TYPE = "900001#";
 const char* response_OK = "888888#";
 bool isCurrentTowerDirectionRight = false;
+
+union servo_angle_uniontype
+{
+  struct
+  {
+    uint8_t byteH;
+    uint8_t byteL;
+  } half;
+  int full;
+} servoAngle;
+
+union speed_motor_uniontype
+{
+  struct
+  {
+    uint8_t byteLeftH : 4;
+    uint8_t byteRightL : 4;
+  } half;
+  uint8_t full;
+} speedMotorUnion;
+
+union motor_gun_tower_uniontype
+{
+  struct
+  {
+    uint8_t moveMotorLeftBack : 1;
+    uint8_t moveMotorLeftForward : 1;
+    uint8_t moveMotorRightBack : 1;
+    uint8_t moveMotorRightForward : 1;
+    uint8_t moveTowerLeft : 1;
+    uint8_t moveTowerRight : 1;
+    uint8_t moveGunUp : 1;
+    uint8_t moveGunDown : 1;
+  } bitField;
+  uint8_t full;
+} motorGunTowerUnion;
 
 void setup()
 {
@@ -87,32 +124,26 @@ void setup()
   pinMode(PINSTEPPER_STEP, OUTPUT);
   digitalWrite (PINSTEPPER_STEP , LOW);
 
-  //на старте прописать частоту в 3 отправки (сон, частота, пробуждение)
-  //и стартовые значения ствола в 4 отправки (4 регистра)
-  writeToI2c (PCA9685_ADDRESS , PCA9685_REG_MODE1 , SLEEP_ON); // сон
-  writeToI2c (PCA9685_ADDRESS , PCA9685_REG_PRE_SCALE , SCALE); // частота
+  servoAngle.full = SERVANGLE_MID;
+  writeToI2c (PCA9685_ADDRESS , PCA9685_REG_MODE1 , SLEEP_ON); // сон для выставления частоты
+  writeToI2c (PCA9685_ADDRESS , PCA9685_REG_PRE_SCALE , PCA9685_SCALE); // частота
   writeToI2c (PCA9685_ADDRESS , PCA9685_REG_MODE1 , SLEEP_OFF); // пробуждение
   writeToI2c (PCA9685_ADDRESS , PCA9685_REG_LED0_ON_L , 0x00); // и 4 регистра
   writeToI2c (PCA9685_ADDRESS , PCA9685_REG_LED0_ON_H , 0x00);
-  writeToI2c (PCA9685_ADDRESS , PCA9685_REG_LED0_OFF_L , 0x37);
-  writeToI2c (PCA9685_ADDRESS , PCA9685_REG_LED0_OFF_H , 0x01);
-
+  writeToI2c (PCA9685_ADDRESS , PCA9685_REG_LED0_OFF_L , servoAngle.half.byteL);
+  writeToI2c (PCA9685_ADDRESS , PCA9685_REG_LED0_OFF_H , servoAngle.half.byteH);
+  
   delay (500);
-
-
 }
 
-void loop() 
+void loop()
 {
 while (1)
 {
-  if (Serial.available())
-  { 
+  if (Serial.available()) { 
     int i = 0;
-    while (1)
-    {
-      if (Serial.available())
-      {
+    while (1) {
+      if (Serial.available()) {
         commandBuffer[i] = Serial.read();
         if (commandBuffer[i] == '#') 
           break;
@@ -120,8 +151,7 @@ while (1)
       }
     }
     
-    switch(commandBuffer[COMMAND_TYPE])
-    {
+    switch(commandBuffer[COMMAND_TYPE]) {
       case 'T':
         brakeAndStopTower ();
         stopMotorLeft ();
@@ -140,6 +170,8 @@ while (1)
         cleanCommandBuffer ();
         break;
       case 'C':
+        speedMotorUnion.full = commandBuffer[MOTORSPEED_OR_ID];
+        motorGunTowerUnion.full = commandBuffer[MOTOR_GUN_TOWER];
         controlTower ();
         controlMotor ();
         break;
@@ -165,82 +197,59 @@ while (1)
 
 void controlGun ()
 {
-  int directionGun = (commandBuffer[MOTOR_GUN_TOWER] & 3);
-  switch (directionGun)
-  {
-    case 1:
-      moveGunDown ();
-      break;
-    case 2:
-      moveGunUp ();
-      break;
-    default:
-      break;
+  if (motorGunTowerUnion.bitField.moveGunDown) {
+    moveGunDown ();
+  }
+  else if (motorGunTowerUnion.bitField.moveGunUp) {
+    moveGunUp ();
   }
 }
 
 void controlTower ()
 {
-  int directionTower = ((commandBuffer[MOTOR_GUN_TOWER] >> 2) & 3);
-  switch (directionTower)
-  {
-    case 1:
-      needTurnTowerRight ();
-      break;
-    case 2:
-      needTurnTowerLeft ();
-      break;
-    default:
-      brakeAndStopTower ();
-      break;
+  if (motorGunTowerUnion.bitField.moveTowerRight) {
+    needTurnTowerRight ();
+  }
+  else if (motorGunTowerUnion.bitField.moveTowerLeft) {
+    needTurnTowerLeft ();
+  }
+  else {
+    brakeAndStopTower ();
   }
 }
 
 void controlMotor ()
 {
-  int motorCurrentLeftSpeed = (commandBuffer[MOTORSPEED_OR_ID] >> 4);
-  motorCurrentLeftSpeed = map (motorCurrentLeftSpeed, 1, 15, 30, 80);
-
-  int motorCurrentRightSpeed = (commandBuffer[MOTORSPEED_OR_ID] & 15);
-  motorCurrentRightSpeed = map (motorCurrentRightSpeed, 1, 15, 30, 80);
+  int motorCurrentLeftSpeed = map (speedMotorUnion.half.byteLeftH, 1, 15, 30, 80);
+  int motorCurrentRightSpeed = map (speedMotorUnion.half.byteRightL, 1, 15, 30, 80);
   
   setMotorLeftSpeed (motorCurrentLeftSpeed);
   setMotorRightSpeed (motorCurrentRightSpeed);
 
-  int directionLeftMotor = (commandBuffer[MOTOR_GUN_TOWER] >> 6);
-  int directionRightMotor = ((commandBuffer[MOTOR_GUN_TOWER] >> 4 ) & 3 );
-
-  switch (directionLeftMotor)
-  {
-    case 1:
-      moveMotorLeftForward ();
-      break;
-    case 2:
-      moveMotorLeftBack ();  
-      break;
-    default:
-      stopMotorLeft ();
-      break;
+  if (motorGunTowerUnion.bitField.moveMotorLeftForward) {
+    moveMotorLeftForward ();
+  }
+  else if (motorGunTowerUnion.bitField.moveMotorLeftBack) {
+    moveMotorLeftBack (); 
+  }
+  else {
+    stopMotorLeft ();
   }
 
-  switch (directionRightMotor)
-  {
-    case 1:
-      moveMotorRightForward ();  
-      break;
-    case 2:
-      moveMotorRightBack ();
-      break;
-    default:
-      stopMotorRight ();
-      break;
+  if (motorGunTowerUnion.bitField.moveMotorRightForward) {
+    moveMotorRightForward ();
+  }
+  else if (motorGunTowerUnion.bitField.moveMotorRightBack) {
+    moveMotorRightBack ();
+  }
+  else {
+    stopMotorRight ();
   }
 }
 
 void shoot ()
 {
-  for (int i = 0; i < 3; i++)
-  {
+  for (int i = 0; i < 3; i++) {
     irsend.sendSony(IDtank, 12);
     motionOnRecoil (i);
     delay(50);
@@ -268,29 +277,27 @@ void motionFromHit ()
 }
 
 //544 мкс    1520 мкс    2400 мкс          20000мкс 4.882
-//112        311         491                          4096
+//112        311         491               4096
 //servo_min = 0x70 , но по факту 0x79
 //servo_mid = 0x137
 //servo_max = 0x1EB
 
-void moveGunUp () // переписать на i2c
+void moveGunUp ()
 {
-  if (servoAngle > SERVANGLE_TOP && millis()- timePointOfLastServoMove > lagBetweenMoveGun)
-  {
-    --servoAngle;
-    writeToI2c (PCA9685_ADDRESS , int reg , int byte);//недоделано
-    writeToI2c (PCA9685_ADDRESS , int reg , int byte);
+  if (servoAngle.full > SERVANGLE_TOP && millis()- timePointOfLastServoMove > lagBetweenMoveGun) {
+    servoAngle.full -= 5;
+    writeToI2c (PCA9685_ADDRESS , PCA9685_REG_LED0_OFF_L , servoAngle.half.byteL);
+    writeToI2c (PCA9685_ADDRESS , PCA9685_REG_LED0_OFF_H , servoAngle.half.byteH);
     timePointOfLastServoMove = millis();
   }
 }
 
-void moveGunDown () //переписать на i2c
+void moveGunDown ()
 {
-  if (servoAngle < SERVANGLE_BOTTOM && millis()- timePointOfLastServoMove > lagBetweenMoveGun)
-  {
-    ++servoAngle;
-    writeToI2c (PCA9685_ADDRESS , int reg , int byte);//недоделано
-    writeToI2c (PCA9685_ADDRESS , int reg , int byte);
+  if (servoAngle.full < SERVANGLE_BOTTOM && millis()- timePointOfLastServoMove > lagBetweenMoveGun) {
+    servoAngle.full += 5;
+    writeToI2c (PCA9685_ADDRESS , PCA9685_REG_LED0_OFF_L , servoAngle.half.byteL);
+    writeToI2c (PCA9685_ADDRESS , PCA9685_REG_LED0_OFF_H , servoAngle.half.byteH);
     timePointOfLastServoMove = millis();
   }
 }
@@ -350,8 +357,7 @@ void cleanCommandBuffer ()
 
 void cleanSerialBuffer ()
 {
-  while (Serial.available() != 0)
-  {
+  while (Serial.available() != 0) {
     Serial.read();
   }
 }
@@ -359,7 +365,7 @@ void cleanSerialBuffer ()
 void motionOnRecoil (int i)
 {
   if ( !(digitalRead(PINMOTOR_RIGHT_ENABLE) ) && !(digitalRead(PINMOTOR_LEFT_ENABLE)) ) {
-    switch (i){
+    switch (i) {
       case (1):
         moveMotorRightBack ();
         moveMotorLeftBack ();
@@ -381,38 +387,32 @@ void motionOnRecoil (int i)
 
 void needTurnTowerRight ()
 {
-  if ( !(counterOfTowerSteps > extremePositionOfTower))
-  {  
+  if ( !(counterOfTowerSteps > extremePositionOfTower)) {  
     PORTB |= B00100000; //digitalWrite (PINSTEPPER_DIR , HIGH);
     isCurrentTowerDirectionRight = true; //можно переписать на чтение значения бита
     TCCR1B |= (1 << CS10);
-    if (valueTowerTIM < 53000)
-    {
+    if (valueTowerTIM < 53000) {
       valueTowerTIM += 50;
     }
     delay (5);
   }
-  else
-  {
+  else {
     brakeAndStopTower ();
   }
 }
 
 void needTurnTowerLeft ()
 {
-  if ( !(counterOfTowerSteps < -(extremePositionOfTower)))
-  {
+  if ( !(counterOfTowerSteps < -(extremePositionOfTower))) {
     PORTB &= ~B00100000; //digitalWrite (PINSTEPPER_DIR , LOW);
     isCurrentTowerDirectionRight = false; //можно переписать на чтение значения бита
     TCCR1B |= (1 << CS10);
-    if (valueTowerTIM < 53000)
-    {
+    if (valueTowerTIM < 53000) {
       valueTowerTIM += 50;
     }
     delay (5);
   }
-  else
-  {
+  else {
     brakeAndStopTower ();
   }
 }
@@ -437,14 +437,13 @@ ISR(TIMER1_OVF_vect)
 {
   TCNT1 = valueTowerTIM;
   digitalWrite(PINSTEPPER_STEP, digitalRead(PINSTEPPER_STEP) ^ 1);
-  if (isCurrentTowerDirectionRight)
-  {
+  if (isCurrentTowerDirectionRight) {
     ++counterOfTowerSteps;
   }
-  else
-  {
+  else {
     --counterOfTowerSteps;
   }
 }
 
 //здесь переименовать все функции управления digitalWrite всеми пинами
+//разбить проект на файлы
