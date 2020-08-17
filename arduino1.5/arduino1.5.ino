@@ -44,7 +44,10 @@
 
 IRsend irsend;
 
+uint8_t incomingBuffer[10] = {0};
 uint8_t commandBuffer[10] = {0};
+bool error = false;
+
 int IDtank = ID_TANK;
 
 //Tower movement
@@ -141,58 +144,83 @@ void loop()
 while (1)
 {
   if (Serial.available()) { 
-    int i = 0;
-    while (1) {
-      if (Serial.available()) {
-        commandBuffer[i] = Serial.read();
-        if (commandBuffer[i] == '#') 
-          break;
-        ++i;
-      }
-    }
     
-    switch(commandBuffer[COMMAND_TYPE]) {
-      case 'T':
-        brakeAndStopTower ();
-        stopMotorLeft ();
-        stopMotorRight ();
-        delay (500);
-        Serial.println (response_TYPE);
-        cleanCommandBuffer ();
-        break;
-      case 'W':
-        brakeAndStopTower ();
-        stopMotorLeft ();
-        stopMotorRight ();
-        IDtank = commandBuffer[MOTORSPEED_OR_ID];
-        delay (500);
-        Serial.println (response_OK);
-        cleanCommandBuffer ();
-        break;
-      case 'C':
-        speedMotorUnion.full = commandBuffer[MOTORSPEED_OR_ID];
-        motorGunTowerUnion.full = commandBuffer[MOTOR_GUN_TOWER];
-        controlTower ();
-        controlMotor ();
-        break;
-      case 'F':
-        brakeAndStopTower ();
-        shoot ();
-        break;
-      case 'X':
-        brakeAndStopTower ();
-        motionFromHit ();
-        cleanCommandBuffer ();
-        break;
-      default:
-        brakeAndStopTower ();
-        cleanCommandBuffer ();
-        break;
+    error = readSerialToIncomingBuffer();
+    if (!error) {
+      transformIncomingToCommandBuffer();
+      commandProcessing();
     }
   }
   controlTower ();
   controlGun ();
 }
+}
+
+bool readSerialToIncomingBuffer()
+{
+  int i = 0;
+  while (1) {
+    if (Serial.available()) {
+      incomingBuffer[i] = Serial.read();
+      if (incomingBuffer[i] == '#') {
+        return false;
+      }
+      ++i;
+      if (i == 4) {
+        return true;
+      }
+    }
+  }
+}
+
+void transformIncomingToCommandBuffer()
+{
+  int i = 0;
+  while (incomingBuffer[i] != '#') {
+    incomingBuffer[i] = commandBuffer[i];
+  }
+}
+
+void commandProcessing()
+{
+  switch(commandBuffer[COMMAND_TYPE]) {
+    case 'T':
+      brakeAndStopTower ();
+      stopMotorLeft ();
+      stopMotorRight ();
+      delay (500);
+      Serial.println (response_TYPE);
+      cleanCommandBuffer ();
+      break;
+    case 'W':
+      brakeAndStopTower ();
+      stopMotorLeft ();
+      stopMotorRight ();
+      IDtank = commandBuffer[MOTORSPEED_OR_ID];
+      delay (500);
+      Serial.println (response_OK);
+      cleanCommandBuffer ();
+      break;
+    case 'C':
+      speedMotorUnion.full = commandBuffer[MOTORSPEED_OR_ID];
+      motorGunTowerUnion.full = commandBuffer[MOTOR_GUN_TOWER];
+      controlTower ();
+      controlMotor ();
+      break;
+    case 'F':
+      brakeAndStopTower ();
+      shoot ();
+      break;
+    case 'X':
+      brakeAndStopTower ();
+      motionFromHit ();
+      cleanCommandBuffer ();
+      break;
+    default:
+      brakeAndStopTower ();
+      cleanCommandBuffer ();
+      break;
+  }
 }
 
 void controlGun ()
