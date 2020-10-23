@@ -172,6 +172,7 @@ bool readSerialToIncomingBuffer()
   }
 }
 
+
 void transformIncomingToCommandBuffer()
 {
   int i = 0;
