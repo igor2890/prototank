@@ -55,8 +55,7 @@ const int extremePositionOfTower = 3500; //ограничение максима
 int counterOfTowerSteps = 0;
 float valueTowerTIM = 45000; //от 43 до 53 тыс оптимально
 
-unsigned long timePointOfLastServoMove;
-unsigned long timePointOfLastChangeSpeedTower;
+unsigned long timePointOfLastServoMove = 0;
 const int lagBetweenMoveGun = 50;
 const char* response_TYPE = "900001#";
 const char* response_OK = "888888#";
@@ -178,6 +177,7 @@ void transformIncomingToCommandBuffer()
   int i = 0;
   while (incomingBuffer[i] != '#') {
     incomingBuffer[i] = commandBuffer[i];
+    ++i;
   }
 }
 
@@ -277,7 +277,7 @@ void controlMotor ()
 
 void shoot ()
 {
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 3; ++i) {
     irsend.sendSony(IDtank, 12);
     motionOnRecoil (i);
     delay(50);
