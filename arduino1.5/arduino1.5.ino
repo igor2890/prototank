@@ -144,10 +144,10 @@ while (1)
 {
   if (Serial.available()) { 
     
-    error = readSerialToIncomingBuffer();
+    error = readSerialToBuffer(incomingBuffer);
     if (!error) {
-      transformIncomingToCommandBuffer();
-      commandProcessing();
+      transformBufferToBuffer( incomingBuffer, commandBuffer);
+      commandProcessing(commandBuffer);
     }
   }
   controlTower ();
@@ -155,13 +155,13 @@ while (1)
 }
 }
 
-bool readSerialToIncomingBuffer()
+bool readSerialToBuffer(uint8_t *buffer)
 {
   int i = 0;
   while (1) {
     if (Serial.available()) {
-      incomingBuffer[i] = Serial.read();
-      if (incomingBuffer[i] == '#') {
+      buffer[i] = Serial.read();
+      if (buffer[i] == '#') {
         return false;
       }
       ++i;
@@ -173,38 +173,38 @@ bool readSerialToIncomingBuffer()
 }
 
 
-void transformIncomingToCommandBuffer()
+void transformBufferToBuffer( uint8_t *bufferIn, uint8_t *bufferOut)
 {
   int i = 0;
-  while (incomingBuffer[i] != '#') {
-    incomingBuffer[i] = commandBuffer[i];
+  while (bufferIn[i] != '#') {
+    bufferIn[i] = bufferOut[i];
     ++i;
   }
 }
 
-void commandProcessing()
+void commandProcessing(uint8_t *buffer)
 {
-  switch(commandBuffer[COMMAND_TYPE]) {
+  switch(buffer[COMMAND_TYPE]) {
     case 'T':
       brakeAndStopTower ();
       stopMotorLeft ();
       stopMotorRight ();
       delay (500);
       Serial.println (response_TYPE);
-      cleanCommandBuffer ();
+      cleanBuffer (buffer);
       break;
     case 'W':
       brakeAndStopTower ();
       stopMotorLeft ();
       stopMotorRight ();
-      IDtank = commandBuffer[MOTORSPEED_OR_ID];
+      IDtank = buffer[MOTORSPEED_OR_ID];
       delay (500);
       Serial.println (response_OK);
-      cleanCommandBuffer ();
+      cleanBuffer (buffer);
       break;
     case 'C':
-      speedMotorUnion.full = commandBuffer[MOTORSPEED_OR_ID];
-      motorGunTowerUnion.full = commandBuffer[MOTOR_GUN_TOWER];
+      speedMotorUnion.full = buffer[MOTORSPEED_OR_ID];
+      motorGunTowerUnion.full = buffer[MOTOR_GUN_TOWER];
       controlTower ();
       controlMotor ();
       break;
@@ -215,11 +215,11 @@ void commandProcessing()
     case 'X':
       brakeAndStopTower ();
       motionFromHit ();
-      cleanCommandBuffer ();
+      cleanBuffer (buffer);
       break;
     default:
       brakeAndStopTower ();
-      cleanCommandBuffer ();
+      cleanBuffer (buffer);
       break;
   }
 }
@@ -379,9 +379,9 @@ void setMotorRightSpeed (int speed)
   analogWrite(PINMOTOR_RIGHT_PWM, speed);
 }
 
-void cleanCommandBuffer ()
+void cleanBuffer (uint8_t *buffer)
 {
-  memset( commandBuffer, 0, sizeof( commandBuffer ) );
+  memset( buffer, 0, sizeof( buffer ) );
 }
 
 void cleanSerialBuffer ()
@@ -457,8 +457,8 @@ void writeToI2c (int address , int reg , int byte)
 {
   Wire.beginTransmission(address);
   Wire.write(reg);
-	Wire.write(byte);
-	Wire.endTransmission();
+  Wire.write(byte);
+  Wire.endTransmission();
 }
 
 //прерывание для вращения башней
