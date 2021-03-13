@@ -41,7 +41,7 @@ void cleanCommandBuffer ();
 
 void cleanSerialBuffer ();
 
-void motionOnRecoil (int i);
+void motionOnRecoil ();
 
 void needTurnTowerRight ();
 

@@ -132,11 +132,8 @@ void controlMotor ()
 
 void shoot ()
 {
-  for (int i = 0; i < 3; ++i) {
-    irsend.sendSony(Global::IDtank, 12);
-    motionOnRecoil (i);
-    delay(50);
-  }
+  irsend.sendSony(Global::IDtank, 12);
+  motionOnRecoil();
   cleanSerialBuffer ();
 }
 
@@ -245,21 +242,19 @@ void cleanSerialBuffer ()
   }
 }
 
-void motionOnRecoil (int i)
+void motionOnRecoil ()
 {
   if ( !(digitalRead(PINMOTOR_RIGHT_ENABLE) ) && !(digitalRead(PINMOTOR_LEFT_ENABLE)) ) {
-    switch (i) {
-      case (1):
         moveMotorRightBack ();
         moveMotorLeftBack ();
-        break;
-      case (2):
+    setMotorLeftSpeed (60);
+    setMotorRightSpeed (60);
+    delay(50);
+    stopMotorLeft ();
+    stopMotorRight ();
+    delay(10);
         moveMotorRightForward ();
         moveMotorLeftForward ();
-        break;
-      default:
-        break;
-    }
     setMotorLeftSpeed (60);
     setMotorRightSpeed (60);
     delay(50);
