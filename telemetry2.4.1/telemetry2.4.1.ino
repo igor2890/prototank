@@ -1,5 +1,11 @@
+/*
+ * Each tank in the kit must have an individual ID.
+ * You can change ID_TANK in config.h before flash.
+ * Check that ID_TANK in commander-arduino == ID_TANK in telemetry-arduino.
+ */
+
 #include <Wire.h>
-#include <IRremote.h>
+#include <IRremote.h> //use version 2.6.0 please
 
 #include "config.h"
 
@@ -233,14 +239,14 @@ void updatingVoltValue (){
 }
 
 int CatchHit(){
-  int TankID = 0;
+  int enemyTankID = 0;
   if (irrecv.decode(&results)) {
-        if (results.value > 1) {
-          TankID = results.value;
+        if ((results.value != 1) && (results.value != ID_TANK)) {
+          enemyTankID = results.value;
         }
     irrecv.resume(); 
   }
-  return TankID;
+  return enemyTankID;
 }
 
 void SendTele(){

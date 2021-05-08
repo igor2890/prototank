@@ -7,4 +7,5 @@
 #define RECV_PIN 11
 #define VOLT_PIN A7
 
+#define ID_TANK 50
 #define SERIAL_SPEED 115200
