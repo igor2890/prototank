@@ -1,16 +1,23 @@
+/*
+ * Each tank in the kit must have an individual ID.
+ * You can change ID_TANK in config.h before flash.
+ * Check that ID_TANK in commander-arduino == ID_TANK in telemetry-arduino.
+ */
+
 #include <Wire.h>
-#include <IRremote.h>
+#include <IRremote.h> //use version 2.6.0 please
 
 #include "commander1.5.1.h"
 #include "config.h"
 #include "global.h"
+#include "constants.h"
 
 extern IRsend irsend;
 
 void setup()
 {
   Serial.begin(SERIAL_SPEED);
-  Serial.setTimeout (10);
+  Serial.setTimeout(10);
   Wire.begin();
 
 //настраиваем прерывание timer1 для управления шаговиком башни
@@ -32,35 +39,35 @@ void setup()
   digitalWrite(PINMOTOR_LEFT_ENABLE, LOW);
   
   pinMode(PINSTEPPER_DIR, OUTPUT);
-  digitalWrite (PINSTEPPER_DIR , LOW);
+  digitalWrite(PINSTEPPER_DIR, LOW);
   pinMode(PINSTEPPER_STEP, OUTPUT);
-  digitalWrite (PINSTEPPER_STEP , LOW);
+  digitalWrite(PINSTEPPER_STEP, LOW);
 
   Global::servoAngle.full = SERVANGLE_MID;
-  writeToI2c (PCA9685_ADDRESS , PCA9685_REG_MODE1 , SLEEP_ON); // сон для выставления частоты
-  writeToI2c (PCA9685_ADDRESS , PCA9685_REG_PRE_SCALE , PCA9685_SCALE); // частота
-  writeToI2c (PCA9685_ADDRESS , PCA9685_REG_MODE1 , SLEEP_OFF); // пробуждение
-  writeToI2c (PCA9685_ADDRESS , PCA9685_REG_LED0_ON_L , 0x00); // и 4 регистра
-  writeToI2c (PCA9685_ADDRESS , PCA9685_REG_LED0_ON_H , 0x00);
-  writeToI2c (PCA9685_ADDRESS , PCA9685_REG_LED0_OFF_L , Global::servoAngle.half.byteL);
-  writeToI2c (PCA9685_ADDRESS , PCA9685_REG_LED0_OFF_H , Global::servoAngle.half.byteH);
+  writeToI2c(PCA9685_ADDRESS, PCA9685_REG_MODE1, SLEEP_ON); // сон для выставления частоты
+  writeToI2c(PCA9685_ADDRESS, PCA9685_REG_PRE_SCALE, PCA9685_SCALE); // частота
+  writeToI2c(PCA9685_ADDRESS, PCA9685_REG_MODE1, SLEEP_OFF); // пробуждение
+  writeToI2c(PCA9685_ADDRESS, PCA9685_REG_LED0_ON_L, 0x00); // и 4 регистра
+  writeToI2c(PCA9685_ADDRESS, PCA9685_REG_LED0_ON_H, 0x00);
+  writeToI2c(PCA9685_ADDRESS, PCA9685_REG_LED0_OFF_L, Global::servoAngle.half.byteL);
+  writeToI2c(PCA9685_ADDRESS, PCA9685_REG_LED0_OFF_H, Global::servoAngle.half.byteH);
   
-  delay (500);
+  delay(500);
 }
 
 void loop()
 {
-while (1)
+while(1)
 {
   if (Serial.available()) { 
     
-    Global::error = readSerialToIncomingBuffer();
-    if (!Global::error) {
-      transformIncomingToCommandBuffer();
-      commandProcessing();
+    bool error = readSerialToIncomingBuffer(Global::incomingBuffer, Constants::lenghtOfSerialCommand);
+    if (!error) {
+      transformIncomingToCommandBuffer(Global::incomingBuffer, Global::commandBuffer, Constants::lenghtOfSerialCommand , LENGTH_COMMAND);
+      commandProcessing(Global::commandBuffer, LENGTH_COMMAND);
     }
   }
-  controlTower ();
-  controlGun ();
+  controlTower();
+  controlGun();
 }
 }

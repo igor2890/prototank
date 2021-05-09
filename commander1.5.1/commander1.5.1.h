@@ -1,55 +1,55 @@
 #ifndef COMMAND_H
 #define COMMAND_H
 
-bool readSerialToIncomingBuffer();
+bool readSerialToIncomingBuffer(uint8_t* arrayBuffer, int serialCommandLength);
 
-void transformIncomingToCommandBuffer();
+void transformIncomingToCommandBuffer(uint8_t* arrayFrom, uint8_t* arrayTo, int serialCommandLength, int commandLength);
 
-void commandProcessing();
+void commandProcessing(uint8_t* arrayCommand, int commandLength);
 
-void controlGun ();
+void controlGun();
 
-void controlTower ();
+void controlTower();
 
-void controlMotor ();
+void controlMotor();
 
-void shoot ();
+void shoot();
 
-void motionFromHit ();
+void motionFromHit();
 
-void moveGunUp ();
+void moveGunUp();
 
-void moveGunDown ();
+void moveGunDown();
 
-void moveMotorLeftForward ();
+void moveMotorLeftForward();
 
-void moveMotorLeftBack ();
+void moveMotorLeftBack();
 
-void moveMotorRightForward ();
+void moveMotorRightForward();
 
-void moveMotorRightBack ();
+void moveMotorRightBack();
 
-void stopMotorLeft ();
+void stopMotorLeft();
 
-void stopMotorRight ();
+void stopMotorRight();
 
-void setMotorLeftSpeed (int speed);
+void setMotorLeftSpeed(int speedMot);
 
-void setMotorRightSpeed (int speed);
+void setMotorRightSpeed(int speedMot);
 
-void cleanCommandBuffer ();
+void cleanCommandBuffer(uint8_t* arrayCom, int commandLength);
 
-void cleanSerialBuffer ();
+void cleanSerialBuffer();
 
-void motionOnRecoil ();
+void motionOnRecoil();
 
-void needTurnTowerRight ();
+void needTurnTowerRight();
 
-void needTurnTowerLeft ();
+void needTurnTowerLeft();
 
-void brakeAndStopTower ();
+void brakeAndStopTower();
 
-void writeToI2c (int address , int reg , int byte);
+void writeToI2c(int address, int reg, int byte);
 
 ISR(TIMER1_OVF_vect);
 

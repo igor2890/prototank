@@ -38,3 +38,5 @@
 
 #define ID_TANK 50
 #define SERIAL_SPEED 115200
+
+#define LENGTH_COMMAND 4
